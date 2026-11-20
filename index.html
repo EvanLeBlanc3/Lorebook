@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lorebook">
+<meta name="theme-color" content="#120a1f">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<title>Lorebook</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="probe"></div>
+<div id="frame" data-theme="grand">
+  <div id="app">
+
+    <!-- BOOT -->
+    <section id="boot" class="screen">
+      <div class="boot-glow"></div>
+      <div class="boot-book"><i class="bb-l"></i><i class="bb-r"></i><i class="bb-s"></i></div>
+      <div class="boot-title">LOREBOOK</div>
+      <div class="boot-sub">dusting off the shelves…</div>
+    </section>
+
+    <!-- WELCOME -->
+    <section id="welcome" class="screen hidden"></section>
+
+    <!-- LIBRARY -->
+    <section id="library" class="screen hidden">
+      <div class="wall"></div>
+      <div class="wall-deco"></div>
+      <canvas id="fxcv"></canvas>
+      <div class="vignette"></div>
+      <div class="scan"></div>
+
+      <div class="hud">
+        <button class="lvl" id="btnTrophy" aria-label="Trophies">
+          <span class="lvl-badge" id="lvlNum">1</span>
+          <span class="lvl-txt"><b id="lvlRank">Apprentice Scribe</b><i class="xpbar"><u id="xpFill"></u></i></span>
+        </button>
+        <div class="hud-btns">
+          <button class="hud-btn" id="btnSound" aria-label="Sound"></button>
+          <button class="hud-btn" id="btnTheme" aria-label="Theme"></button>
+          <button class="hud-btn" id="btnSettings" aria-label="Settings"><span class="dot-badge hidden" id="setBadge"></span></button>
+        </div>
+      </div>
+
+      <div class="lib-scroll" id="libScroll">
+        <div class="lib-head">
+          <div class="sign" id="sign">
+            <i class="chain l"></i><i class="chain r"></i>
+            <div class="sign-plank"><span class="sign-t">LOREBOOK</span><small class="sign-s">your gaming chronicles</small></div>
+            <div class="greet" id="greet"></div>
+          </div>
+          <div class="win-wrap" id="winWrap">
+            <div class="win" id="win">
+              <canvas id="winCv"></canvas>
+              <i class="curt l"></i><i class="curt r"></i>
+              <i class="win-bars"></i><i class="glare"></i>
+            </div>
+            <div class="sill"><span class="sill-item" id="sillItem"></span></div>
+          </div>
+        </div>
+        <div id="nudge"></div>
+        <div class="case" id="case">
+          <div class="rows" id="rows"></div>
+        </div>
+        <div class="plinth"></div>
+        <div class="floor"><i class="rug"></i></div>
+      </div>
+    </section>
+
+    <!-- JOURNAL -->
+    <section id="journal" class="screen hidden">
+      <div class="j-bg"></div>
+      <header class="j-top">
+        <button class="j-btn" id="jBack" aria-label="Back to shelf"></button>
+        <div class="j-title" id="jTitle"></div>
+        <button class="j-btn" id="jMenu" aria-label="Book menu"></button>
+      </header>
+      <div class="j-tabs">
+        <div class="seg" id="jSeg"><button data-tab="pages" class="on">Pages</button><button data-tab="gallery">Gallery</button><i></i></div>
+        <div class="j-meta" id="jMeta"></div>
+      </div>
+      <div class="j-search hidden" id="jSearch"><input id="jSearchIn" type="search" placeholder="Search this book…" autocomplete="off"></div>
+      <div class="j-book" id="jBook">
+        <i class="j-gutter"></i>
+        <div class="pages" id="pages"></div>
+        <div class="gallery hidden" id="gallery"></div>
+      </div>
+      <footer class="composer" id="composer">
+        <div class="cmp-edit hidden" id="cmpEdit"><span>Editing an entry</span><button id="cmpCancel">Cancel</button></div>
+        <div class="cmp-tags" id="cmpTags"></div>
+        <div class="cmp-photo hidden" id="cmpPhoto"><img alt=""><button id="cmpPhotoX" aria-label="Remove photo"></button></div>
+        <textarea id="cmpText" rows="1" placeholder="Write a note about your adventure…" maxlength="4000"></textarea>
+        <div class="cmp-bar">
+          <button class="cmp-ic" id="cmpCam" aria-label="Take a picture"></button>
+          <button class="cmp-ic" id="cmpPic" aria-label="Choose a picture"></button>
+          <button class="cmp-ic" id="cmpStar" aria-label="Mark as special moment"></button>
+          <span class="cmp-count" id="cmpCount"></span>
+          <button class="cmp-save" id="cmpSave"><span class="qi"></span><b>Inscribe</b></button>
+        </div>
+        <input type="file" id="fileCam" accept="image/*" capture="environment" hidden>
+        <input type="file" id="filePic" accept="image/*" hidden>
+      </footer>
+    </section>
+
+    <!-- OVERLAYS -->
+    <div id="stage" class="hidden"></div>
+    <div id="sheetLayer"></div>
+    <div id="lightbox" class="hidden"></div>
+    <div id="toasts"></div>
+    <div id="fx"></div>
+    <div id="wipe"></div>
+  </div>
+</div>
+<input type="file" id="fileImport" accept=".json,application/json" hidden>
+
+<script src="js/core.js"></script>
+<script src="js/weather.js"></script>
+<script src="js/books.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/sheets.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
