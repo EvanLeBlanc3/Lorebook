@@ -62,12 +62,19 @@
             <div class="win" id="win">
               <canvas id="winCv"></canvas>
               <i class="curt l"></i><i class="curt r"></i>
-              <i class="win-bars"></i><i class="glare"></i>
+              <i class="win-bars"></i><i class="glare"></i><i class="shutter"></i>
             </div>
             <div class="sill"><span class="sill-item" id="sillItem"></span></div>
           </div>
         </div>
         <div id="nudge"></div>
+        <div class="shelfwrap" id="shelfwrap">
+          <div class="shelfbar">
+            <label class="sb-search"><span class="sb-ic" id="sbIc"></span><input id="shelfQ" type="search" placeholder="Search books &amp; notes…" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="sb-x hidden" id="shelfQx" aria-label="Clear search"></button></label>
+            <button class="sb-btn" id="shelfSort" aria-label="Sort and arrange the shelf"></button>
+          </div>
+          <div class="shelfinfo" id="shelfInfo"></div>
+        </div>
         <div class="case" id="case">
           <div class="rows" id="rows"></div>
         </div>
@@ -124,6 +131,7 @@
 
 <script src="js/core.js"></script>
 <script src="js/weather.js"></script>
+<script src="js/scenery.js"></script>
 <script src="js/books.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/sheets.js"></script>

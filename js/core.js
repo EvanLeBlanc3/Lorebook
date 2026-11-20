@@ -43,7 +43,8 @@ const DEFAULT_CFG = {
   theme: 'grand', sound: true, vol: 0.7, ambient: false, enterSaves: false,
   wxMinutes: 30, loc: null, locAt: 0, welcomed: false,
   xp: 0, ach: {}, lastBackup: 0, nudgeDismissed: 0,
-  simCond: 'live', simTime: 'live', sortDesc: false, wxCache: null, seen: {}
+  simCond: 'live', simTime: 'live', sortDesc: false, wxCache: null, seen: {},
+  shelfSort: 'custom', shelfMode: 'casual', shelfSeed: 1
 };
 let CFG;
 try { CFG = Object.assign({}, DEFAULT_CFG, JSON.parse(localStorage.getItem('lorebook.cfg') || '{}')); } catch (e) { CFG = Object.assign({}, DEFAULT_CFG); }
@@ -89,7 +90,7 @@ const DB = {
    SOUND — everything is synthesised, no audio files needed
    ============================================================ */
 const Snd = {
-  ctx: null, master: null, noise: null,
+  ctx: null, master: null, noise: null, unlocked: false,
   init() {
     if (this.ctx) return;
     try {
@@ -178,7 +179,9 @@ const Snd = {
     whoosh() { this.nz(.45, { f0: 300, f1: 1800, vol: .1, q: .6 }); },
     thunder() { this.nz(1.6, { type: 'lowpass', f0: 380, f1: 60, vol: .5, atk: .15 }); this.nz(1.0, { type: 'lowpass', f0: 200, f1: 50, vol: .4, at: .3, atk: .2 }); },
     star() { this.tone(1046, .08, { type: 'triangle', vol: .12 }); this.tone(1568, .16, { type: 'triangle', vol: .12, at: .06 }); },
-    wing() { this.nz(.2, { f0: 600, f1: 1500, vol: .08 }); }
+    wing() { this.nz(.2, { f0: 600, f1: 1500, vol: .08 }); },
+    clank() { this.tone(180, .1, { type: 'square', vol: .1, to: 120 }); this.tone(1200, .08, { type: 'triangle', vol: .08, at: .02 }); this.nz(.06, { f0: 3000, vol: .1 }); },
+    shuffle() { for (let i = 0; i < 6; i++) this.nz(.05, { f0: 700 + i * 250, f1: 2200, q: 1.5, vol: .07, at: i * .045 }); this.tone(240, .08, { type: 'sine', vol: .12, at: .28 }); }
   }
 };
 

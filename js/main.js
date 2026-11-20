@@ -97,7 +97,7 @@ async function init() {
     $('#btnSettings').onclick = () => { Snd.play('tap'); openSettings(); };
     $('#btnSound').onclick = () => { CFG.sound = !CFG.sound; saveCfg(); updateSoundBtn(); if (CFG.sound) { Snd.resume(); Snd.play('chip'); } updateAmbient(); };
     $('#fileImport').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importBackup(f); });
-    initLibraryEvents(); initJournalEvents(); updateHUD();
+    initLibraryEvents(); initShelfBar(); initJournalEvents(); updateHUD();
 
     // weather: use the cache straight away, then refresh in the background
     Wx.refresh().then(() => updateAmbient());

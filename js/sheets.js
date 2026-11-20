@@ -1,13 +1,13 @@
 'use strict';
 /* ============================================================
-   LOREBOOK — sheets: customizer, themes, settings, trophies,
-   backup / restore, demo books, screen checker, welcome
+   LOREBOOK — sheets: customizer, themes, shelf options, settings,
+   trophies, backup / restore, demo books, screen checker, welcome
    ============================================================ */
 
 function shakeEl(e) { e.classList.remove('shake'); void e.offsetWidth; e.classList.add('shake'); }
 
 /* ---------- new / customize book ---------- */
-function newBook(spEl) { Snd.play('chip'); openCustomize(null); }
+function newBook() { Snd.play('chip'); openCustomize(null); }
 
 function openCustomize(bookId) {
   const orig = bookId ? bookById(bookId) : null, isNew = !orig;
@@ -15,7 +15,6 @@ function openCustomize(bookId) {
   const n = orig ? S.entries.filter(e => e.bookId === orig.id).length : 0;
   const chip = (k, v, label, sub, style) => `<button class="chip" data-k="${k}" data-v="${v}" ${style ? `style="${style}"` : ''}>${label}${sub ? `<small>${sub}</small>` : ''}</button>`;
   const html = `
-    <div class="cust-preview" id="cp"></div>
     <div class="sec">Game title</div>
     <input class="field" id="cTitle" maxlength="60" placeholder="e.g. Elden Ring" autocomplete="off" value="${esc(d.title)}">
     <div class="sec">Platform</div>
@@ -41,8 +40,9 @@ function openCustomize(bookId) {
     <div class="sec">Cover picture <span style="letter-spacing:0;text-transform:none;font-weight:600">(replaces the emblem)</span></div>
     <div class="cover-pic"><button class="btn small" id="cPic">${ic('image')} Choose picture</button><button class="btn small ghost ${d.cover ? '' : 'hidden'}" id="cPicX">${ic('x')} Remove</button><input type="file" id="cFile" accept="image/*" hidden></div>`;
   const foot = `${isNew ? '' : `<button class="btn danger small" id="cDel" style="flex:0 0 auto;min-height:46px" aria-label="Delete book">${ic('trash')}</button>`}<button class="btn ghost" id="cCancel">Cancel</button><button class="btn primary" id="cSave">${isNew ? 'Create book' : 'Save changes'}</button>`;
-  const sh = openSheet({ title: isNew ? 'New Quest Journal' : 'Customize Book', icon: isNew ? 'sparkle' : 'palette', html, foot, cls: 'tall' });
-  const B = sh.body, cp = $('#cp', B);
+  // the preview lives in the sheet's pinned area, so it never scrolls away while you tweak the options below it
+  const sh = openSheet({ title: isNew ? 'New Quest Journal' : 'Customize Book', icon: isNew ? 'sparkle' : 'palette', html, foot, cls: 'tall', pin: '<div class="cust-preview" id="cp"></div>' });
+  const B = sh.body, cp = $('#cp', sh.el);
   const paint = () => {
     cp.innerHTML = `<button class="dice" id="cDice" aria-label="Randomize look">${ic('dice')}</button>${coverHTML(d, n)}${spineHTML(d, n)}`;
     $$('[data-k]', B).forEach(x => x.classList.toggle('on', String(d[x.dataset.k]) === x.dataset.v));
@@ -51,7 +51,7 @@ function openCustomize(bookId) {
     $('#cPicX', B).classList.toggle('hidden', !d.cover);
   };
   paint();
-  B.addEventListener('click', e => {
+  sh.el.addEventListener('click', e => {
     const t = e.target.closest('[data-k]'); if (t) { d[t.dataset.k] = t.dataset.v; Snd.play('chip'); paint(); return; }
     if (e.target.closest('#cDice')) { randomBookLook(d); Snd.play('newbook'); paint(); }
   });
@@ -67,7 +67,7 @@ function openCustomize(bookId) {
     d.title = d.title.trim();
     if (!d.title) { Snd.play('err'); shakeEl($('#cTitle', B)); toast('Name your game first, adventurer!', { ms: 1800 }); $('#cTitle', B).focus(); return; }
     if (isNew) {
-      d.order = Date.now(); d.createdAt = Date.now(); S.books.push(d); await DB.put('books', d);
+      d.order = Date.now(); d.createdAt = Date.now(); S.books.push(d); await DB.put('books', d); clearShelfSearch();
       sh.close(); renderLibrary({ quiet: true }); Snd.play('newbook');
       const sp = $(`.sp[data-id="${d.id}"]`);
       if (sp) { sp.classList.add('dropin'); sp.scrollIntoView({ block: 'center', behavior: 'smooth' }); setTimeout(() => { const [x, y] = centerOf(sp); burst(x, y, { n: 30, spread: 120, colors: [d.trim, '#fff6c0', '#ffd35a', '#ff7ac8', '#7ad8ff'] }); }, 650); }
@@ -81,11 +81,33 @@ function openCustomize(bookId) {
   };
 }
 
+/* ---------- sort & arrange the shelf ---------- */
+function openShelfOptions() {
+  const rowsHtml = () => SORTS.map(([id, name, sub, icon]) => `<button class="act sortrow ${CFG.shelfSort === id ? 'on' : ''}" data-sort="${id}">${ic(icon)}<span>${esc(name)}<small>${esc(sub)}</small></span>${CFG.shelfSort === id ? ic('check', 'tick') : ''}</button>`).join('');
+  const modes = [['tidy', 'Tidy', 'All upright'], ['casual', 'Casual', 'Some lean or lie flat'], ['messy', 'Messy', 'A bookworm’s chaos']];
+  const sh = openSheet({
+    title: 'Sort & Arrange', icon: 'sort',
+    html: `<div class="sec">Sort the shelf</div><div id="soList">${rowsHtml()}</div>
+      <div class="sec">How the books sit</div>
+      <div class="chips" id="soModes">${modes.map(([id, n, s]) => `<button class="chip ${CFG.shelfMode === id ? 'on' : ''}" data-mode="${id}">${n}<small>${s}</small></button>`).join('')}</div>
+      <div style="margin-top:14px"><button class="btn small" id="soShuffle">${ic('shuffle')} Reshuffle the mess</button></div>
+      <p class="dim" style="margin:14px 0 0;line-height:1.45">Leaning and lying-flat are just for looks — every book stays tappable, searchable and sortable. Hold a book to open its menu.</p>`
+  });
+  const relist = () => { $('#soList', sh.body).innerHTML = rowsHtml(); };
+  sh.body.addEventListener('click', e => {
+    const r = e.target.closest('[data-sort]');
+    if (r) { CFG.shelfSort = r.dataset.sort; saveCfg(); relist(); Snd.play('shuffle'); renderLibrary(); unlock('tidy'); return; }
+    const m = e.target.closest('[data-mode]');
+    if (m) { CFG.shelfMode = m.dataset.mode; saveCfg(); $$('[data-mode]', sh.body).forEach(x => x.classList.toggle('on', x === m)); Snd.play('shuffle'); renderLibrary(); return; }
+    if (e.target.closest('#soShuffle')) { CFG.shelfSeed = (CFG.shelfSeed || 1) + 1; saveCfg(); if (CFG.shelfMode === 'tidy') { CFG.shelfMode = 'casual'; saveCfg(); $$('[data-mode]', sh.body).forEach(x => x.classList.toggle('on', x.dataset.mode === 'casual')); } Snd.play('shuffle'); renderLibrary(); }
+  });
+}
+
 /* ---------- theme picker ---------- */
 function openThemes() {
   const sh = openSheet({
     title: 'Library Theme', icon: 'palette',
-    html: `<p class="dim" style="margin:0 0 14px">Pick the room your books live in.</p><div class="th-grid">${Object.entries(THEMES).map(([id, t]) => `<button class="th-card ${CFG.theme === id ? 'on' : ''}" data-t="${id}"><div class="th-prev" style="background:linear-gradient(180deg,${t.swatch[0]},${mix(t.swatch[0], '#000000', .55)})">${ic(t.icon)}<b style="background:${t.swatch[2]};box-shadow:0 0 14px ${t.swatch[2]}"></b><i style="background:${t.swatch[1]}"></i></div><h4>${esc(t.name)}</h4><p>${esc(t.blurb)}</p></button>`).join('')}</div>`
+    html: `<p class="dim" style="margin:0 0 14px">Pick the room your books live in. The window changes to match.</p><div class="th-grid">${Object.entries(THEMES).map(([id, t]) => `<button class="th-card ${CFG.theme === id ? 'on' : ''}" data-t="${id}"><div class="th-prev" style="background:linear-gradient(180deg,${t.swatch[0]},${mix(t.swatch[0], '#000000', .55)})">${ic(t.icon)}<b style="background:${t.swatch[2]};box-shadow:0 0 14px ${t.swatch[2]}"></b><i style="background:${t.swatch[1]}"></i></div><h4>${esc(t.name)}</h4><p>${esc(t.blurb)}</p></button>`).join('')}</div>`
   });
   sh.body.addEventListener('click', e => {
     const c = e.target.closest('.th-card'); if (!c || c.dataset.t === CFG.theme) return;
@@ -163,20 +185,24 @@ const DEMO_BOOKS = [
   { title: 'Hollow Knight', platform: 'PC', style: 'tome', color: '#1d2a4d', trim: '#c0c7d1', font: 'copper', emblem: 'shield', pattern: 'runes', size: 'tall', thick: 'normal', effect: 'foil',
     e: [['Finally beat the False Knight. My thumbs have filed a formal complaint.', 'boss', 0], ['Found a bench in the Forgotten Crossroads. Sat for a solid five minutes. 10/10 bench.', 'note', 0], ['Cracked wall behind the Greenpath lantern. ALWAYS check the cracked walls.', 'secret', 1], ['Got the Mothwing Cloak. Dashing at everything like I own the place.', 'loot', 2]] },
   { title: 'Tears of the Kingdom', platform: 'Switch', style: 'grimoire', color: '#2f6b2a', trim: '#e3b341', font: 'papyrus', emblem: 'key', pattern: 'scales', size: 'tall', thick: 'thick', effect: 'glow',
-    e: [['Built a flying machine. It flew for 4 seconds. Both are records.', 'hype', 3], ['Zonai device count: many. Common sense count: negative.', 'funny', 0], ['Reached the Depths and immediately regretted every choice.', 'oops', 0], ['Lightroot unlocked. The map is finally making sense.', 'quest', 0]] },
+    e: [['Built a flying machine. It flew for 4 seconds. Both are records.', 'hype', 3], ['Zonai device count: many. Common sense count: negative.', 'note', 0], ['Reached the Depths and immediately regretted every choice.', 'oops', 0], ['Lightroot unlocked. The map is finally making sense.', 'quest', 0]] },
   { title: 'Stardew Valley', platform: 'PC', style: 'paperback', color: '#f5e6c8', trim: '#2f8f4b', font: 'marker', emblem: 'tree', pattern: 'dots', size: 'medium', thick: 'slim', effect: 'none',
-    e: [['Spring 12: planted 40 parsnips. Spring 13: forgot to water them. Farmers, am I right.', 'note', 0], ['Gave Abigail an amethyst. She loved it. I am now a legend.', 'hype', 1], ['A chicken followed me for 3 whole days. We are a family now.', 'funny', 0]] },
+    e: [['Spring 12: planted 40 parsnips. Spring 13: forgot to water them. Farmers, am I right.', 'note', 0], ['Gave Abigail an amethyst. She loved it. I am now a legend.', 'hype', 1], ['A chicken followed me for 3 whole days. We are a family now.', 'note', 0]] },
   { title: 'Halo Infinite', platform: 'Xbox', style: 'gamecase', color: '#4b5563', trim: '#22e5ff', font: 'futura', emblem: 'bolt', pattern: 'circuit', size: 'medium', thick: 'normal', effect: 'sparkle',
     e: [['Grappleshot to a Banished Brute’s face. Peak gaming.', 'boss', 4], ['Found a Skull hidden above the second outpost. Hidden in plain sight.', 'secret', 0], ['Warthog flip #12. Not on purpose. Mostly.', 'oops', 0]] },
   { title: 'Pokémon Emerald', platform: 'Retro', style: 'cartridge', color: '#0f766e', trim: '#ffffff', font: 'arcade', emblem: 'star', pattern: 'pixels', size: 'medium', thick: 'normal', effect: 'sparkle',
-    e: [['Caught a Ralts at last. The cheerful little goblin is mine now.', 'loot', 5], ['Wallace’s Gym: Suspiciously Fabulous. I respect it.', 'boss', 0], ['Blew on the cartridge. Game worked. Science.', 'funny', 0]] },
+    e: [['Caught a Ralts at last. The cheerful little goblin is mine now.', 'loot', 5], ['Wallace’s Gym: Suspiciously Fabulous. I respect it.', 'boss', 0], ['Blew on the cartridge. Game worked. Science.', 'note', 0]] },
   { title: 'Cyberpunk 2077', platform: 'PC', style: 'datapad', color: '#111827', trim: '#ff4fd8', font: 'terminal', emblem: 'bolt', pattern: 'circuit', size: 'medium', thick: 'slim', effect: 'glow',
-    e: [['Night City at sunset hits different. Photo mode: abused.', 'hype', 1], ['Skipped the main quest for 6 hours. Zero regrets, 40 new jackets.', 'quest', 0], ['Johnny Silverhand has opinions. Johnny Silverhand is in my head.', 'funny', 0]] }
+    e: [['Night City at sunset hits different. Photo mode: abused.', 'hype', 1], ['Skipped the main quest for 6 hours. Zero regrets, 40 new jackets.', 'quest', 0], ['Johnny Silverhand has opinions. Johnny Silverhand is in my head.', 'note', 0]] },
+  { title: 'Sea of Thieves', platform: 'Xbox', style: 'tome', color: '#0f4c5c', trim: '#e8b84a', font: 'papyrus', emblem: 'map', pattern: 'waves', size: 'medium', thick: 'normal', effect: 'none',
+    e: [['Sunk our own ship with a cannonball. In our defence, the cannon was very tempting.', 'oops', 2], ['Found the Sunken Treasure! Four buckets of gold and one very smug parrot.', 'loot', 0]] },
+  { title: 'Animal Crossing', platform: 'Switch', style: 'paperback', color: '#84cc16', trim: '#ffffff', font: 'marker', emblem: 'heart', pattern: 'dots', size: 'short', thick: 'slim', effect: 'none',
+    e: [['Paid off my house loan. Tom Nook now regards me as an equal.', 'hype', 0], ['Caught a coelacanth. Immediate celebration dance.', 'loot', 1]] }
 ];
 async function summonDemo() {
   const now = Date.now(); let order = now, k = 0;
   for (const D of DEMO_BOOKS) {
-    const b = { ...newBookDraft(), ...D, demo: true, order: order++, createdAt: now }; delete b.e; await DB.put('books', b); S.books.push(b);
+    const b = { ...newBookDraft(), ...D, demo: true, order: order++, createdAt: now - k * 3 * 86400000 }; delete b.e; await DB.put('books', b); S.books.push(b);
     let j = 0;
     for (const [text, tag, shot] of D.e) {
       const e = { id: uid(), bookId: b.id, text, tag, star: j === 0 && k % 2 === 0, thumb: null, createdAt: now - (D.e.length - j) * 86400000 * (1 + k % 2) - (9 + (j * 3 + k) % 12) * 3600000, demo: true };
@@ -256,12 +282,12 @@ function openSettings() {
       <button class="btn small" id="sChk" style="justify-self:start">Run screen check</button><div id="sChkOut"></div></div>
 
     <div class="sec">Playground</div>
-    <div class="set-col"><div>Demo library<small>Fills the shelf with six sample books (one of every type) so you can see what’s possible. Demo books don’t count toward achievements.</small></div>
+    <div class="set-col"><div>Demo library<small>Fills the shelf with eight sample books (every type) so you can see the shelf arrangements. Demo books don’t count toward achievements.</small></div>
       <div class="chips"><button class="btn small" id="sDemo">Summon demo books</button><button class="btn small ghost ${hasDemo ? '' : 'hidden'}" id="sDemoX">Remove demo books</button></div></div>
 
     <div class="sec">Danger zone</div>
     <div class="set-col"><button class="btn danger small" id="sReset" style="justify-self:start">${ic('trash')} Erase everything</button></div>
-    <p class="dim" style="text-align:center;margin:22px 0 0">Lorebook v1.0 · all data stays on this device</p>`;
+    <p class="dim" style="text-align:center;margin:22px 0 0">Lorebook v1.1 · all data stays on this device</p>`;
   const sh = openSheet({ title: 'Settings', icon: 'gear', html });
   const B = sh.body, $b = s => $(s, B);
   const tog = (id, key, after) => $b(id).onclick = () => { CFG[key] = !CFG[key]; $b(id).classList.toggle('on', CFG[key]); $b(id).setAttribute('aria-checked', CFG[key]); saveCfg(); Snd.play('chip'); after && after(); };
@@ -288,7 +314,7 @@ function openSettings() {
   };
   $b('#sRestore').onclick = () => { Snd.play('tap'); $('#fileImport').click(); };
   $b('#sChk').onclick = () => { Snd.play('tap'); const ok = renderCheck($b('#sChkOut')); Snd.play(ok ? 'ach' : 'err'); };
-  $b('#sDemo').onclick = async () => { if (S.books.some(b => b.demo)) { toast('Demo books are already on the shelf.'); return; } await summonDemo(); $b('#sDemoX').classList.remove('hidden'); toast('Six demo books summoned!', { ms: 2200 }); };
+  $b('#sDemo').onclick = async () => { if (S.books.some(b => b.demo)) { toast('Demo books are already on the shelf.'); return; } await summonDemo(); $b('#sDemoX').classList.remove('hidden'); toast('Eight demo books summoned!', { ms: 2200 }); };
   $b('#sDemoX').onclick = async () => { await removeDemo(); $b('#sDemoX').classList.add('hidden'); toast('Demo books vanished in a puff.'); };
   $b('#sReset').onclick = async () => {
     if (!await ask('Erase everything?', 'Every book, entry, picture, and achievement on this device will be deleted. Make a backup first if you might want them back!', 'Erase it all', true)) return;

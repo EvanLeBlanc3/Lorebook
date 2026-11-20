@@ -1,9 +1,9 @@
 'use strict';
 /* ============================================================
-   LOREBOOK — UI: helpers, library, book-opening stage, journal
+   LOREBOOK — UI: helpers, library shelf, book-opening stage, journal
    ============================================================ */
 
-const S = { books: [], entries: [], cur: null, tab: 'pages', search: '', busy: false, view: 'boot', compose: null, libScroll: 0, libDirty: true, sky: null, fx: null };
+const S = { books: [], entries: [], cur: null, tab: 'pages', search: '', busy: false, view: 'boot', compose: null, libScroll: 0, libDirty: true, sky: null, fx: null, shelfQ: '' };
 let ROT = 0;
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 const bookById = id => S.books.find(b => b.id === id);
@@ -67,7 +67,7 @@ async function runAch() {
   achBusy = true;
   while (achQueue.length) {
     const a = achQueue.shift(); Snd.play('ach');
-    const t = toast(`<div class="ti">${ic(a.icon)}</div><div><small>Achievement unlocked</small><b>${esc(a.name)}</b><span>${esc(a.desc)} · +25 XP</span></div>`, { cls: 'ach', ms: 3200 });
+    toast(`<div class="ti">${ic(a.icon)}</div><div><small>Achievement unlocked</small><b>${esc(a.name)}</b><span>${esc(a.desc)} · +25 XP</span></div>`, { cls: 'ach', ms: 3200 });
     burst(FW() / 2, 120, { n: 22, spread: 120 });
     await sleep(3000);
   }
@@ -82,9 +82,9 @@ function stats() {
 function checkAch() { const st = stats(); ACH.forEach(a => { if (a.test && !CFG.ach[a.id] && a.test(st)) unlock(a.id); }); }
 
 /* ---------- sheets & dialogs ---------- */
-function openSheet({ title, icon, html = '', foot = null, onClose, cls = '' }) {
+function openSheet({ title, icon, html = '', foot = null, onClose, cls = '', pin = null }) {
   const layer = $('#sheetLayer'), back = el('div', 'sheet-back'), sh = el('div', 'sheet ' + cls);
-  sh.innerHTML = `<div class="sheet-grab"></div><div class="sheet-head"><h2>${icon ? ic(icon) : ''}<span>${esc(title)}</span></h2><button class="sheet-x" aria-label="Close">${ic('x')}</button></div><div class="sheet-body">${html}</div>${foot ? '<div class="sheet-foot"></div>' : ''}`;
+  sh.innerHTML = `<div class="sheet-grab"></div><div class="sheet-head"><h2>${icon ? ic(icon) : ''}<span>${esc(title)}</span></h2><button class="sheet-x" aria-label="Close">${ic('x')}</button></div>${pin ? `<div class="sheet-pin">${pin}</div>` : ''}<div class="sheet-body">${html}</div>${foot ? '<div class="sheet-foot"></div>' : ''}`;
   layer.append(back, sh);
   const api = { el: sh, body: $('.sheet-body', sh), foot: $('.sheet-foot', sh), closed: false };
   if (foot) api.foot.innerHTML = foot;
@@ -92,7 +92,9 @@ function openSheet({ title, icon, html = '', foot = null, onClose, cls = '' }) {
     if (api.closed) return; api.closed = true; back.classList.remove('in'); sh.classList.remove('in'); sh.style.transform = '';
     setTimeout(() => { back.remove(); sh.remove(); }, 420); if (onClose) onClose();
   };
-  const t0 = Date.now(); back.addEventListener('pointerdown', () => { if (Date.now() - t0 > 450) api.close(); }); $('.sheet-x', sh).addEventListener('click', () => { Snd.play('tap'); api.close(); });
+  // a tap that opened the sheet can leave a ghost click behind — ignore the backdrop for a moment
+  const t0 = Date.now(); back.addEventListener('pointerdown', () => { if (Date.now() - t0 > 450) api.close(); });
+  $('.sheet-x', sh).addEventListener('click', () => { Snd.play('tap'); api.close(); });
   // drag the handle down to dismiss
   let y0 = null, dy = 0;
   const grab = $('.sheet-grab', sh), head = $('.sheet-head', sh);
@@ -131,10 +133,16 @@ const SILL = {
   haunted: '<svg viewBox="0 0 34 34"><ellipse cx="17" cy="22" rx="12" ry="10" fill="#ff8a1f"/><path d="M17 12c-3 0-2 20 0 20M10 14c-5 4-3 16 0 18M24 14c5 4 3 16 0 18" stroke="#c45f08" fill="none" stroke-width="1.5"/><path d="M10 20l3 3 2-3zM19 20l2 3 3-3zM12 28q5 3 10 0" fill="#2a1200" stroke="#2a1200" stroke-width="1.5"/><rect x="15" y="8" width="4" height="5" fill="#4f7a2a"/></svg>',
   starship: '',
   treehouse: '<svg viewBox="0 0 34 34"><rect x="14" y="20" width="7" height="13" rx="2" fill="#f1e6c8"/><path d="M5 22C5 11 29 11 29 22z" fill="#d6342f"/><circle cx="12" cy="18" r="2.4" fill="#fff"/><circle cx="21" cy="16" r="2" fill="#fff"/><circle cx="25" cy="20" r="1.5" fill="#fff"/></svg>',
-  dungeon: '<svg viewBox="0 0 34 34"><path d="M17 8c-7 0-11 5-11 11 0 4 2 6 5 7.500V31h12v-4.500c3-1.500 5-3.500 5-7.500 0-6-4-11-11-11z" fill="#ece6d6" stroke="#8a8070" stroke-width="1.500"/><circle cx="12.500" cy="19" r="3" fill="#1b1612"/><circle cx="21.500" cy="19" r="3" fill="#1b1612"/></svg>'
+  dungeon: '<svg viewBox="0 0 34 34"><path d="M17 8c-7 0-11 5-11 11 0 4 2 6 5 7.5V31h12v-4.5c3-1.5 5-3.5 5-7.5 0-6-4-11-11-11z" fill="#ece6d6" stroke="#8a8070" stroke-width="1.5"/><circle cx="12.5" cy="19" r="3" fill="#1b1612"/><circle cx="21.5" cy="19" r="3" fill="#1b1612"/></svg>',
+  cabin: '<svg viewBox="0 0 34 34"><path class="steam" d="M12 12c-2-2 2-4 0-7M18 12c-2-2 2-4 0-7" stroke="#fff" stroke-opacity=".75" fill="none" stroke-width="1.6" stroke-linecap="round"/><path d="M7 14h18v10a5 5 0 01-5 5h-8a5 5 0 01-5-5z" fill="#c0392b"/><path d="M25 17h2a3 3 0 010 7h-2" stroke="#c0392b" stroke-width="2.4" fill="none"/><rect x="7" y="14" width="18" height="3" fill="#6b3a1e"/></svg>',
+  pirate: '<svg viewBox="0 0 34 34"><path d="M14 4h6v6l3 4v17a2 2 0 01-2 2H13a2 2 0 01-2-2V14l3-4z" fill="#2f8f5a" fill-opacity=".85" stroke="#d8f5e2" stroke-width="1"/><rect x="15" y="1.5" width="4" height="4" fill="#a8733f"/><path d="M14 19h6v8h-6z" fill="#f4e7c1" transform="rotate(-8 17 23)"/></svg>',
+  sakura: '<svg viewBox="0 0 34 34"><path d="M17 26c0-6 3-8 1-12" stroke="#5a3a28" stroke-width="2.4" fill="none"/><circle cx="17" cy="10" r="6" fill="#f9b8d0"/><circle cx="11" cy="14" r="4.5" fill="#ffd9e8"/><circle cx="23" cy="14" r="4.5" fill="#f9b8d0"/><path d="M9 26h16l-2 7H11z" fill="#7a2a2a"/></svg>',
+  tomb: '<svg viewBox="0 0 34 34"><ellipse cx="17" cy="21" rx="9" ry="10" fill="#1a6b6b"/><path d="M17 11v20M9 18h16" stroke="#f0c050" stroke-width="1.5"/><circle cx="17" cy="10" r="4" fill="#f0c050"/><path d="M8 13l-5-4M26 13l5-4M8 27l-5 4M26 27l5 4" stroke="#f0c050" stroke-width="2"/></svg>',
+  steampunk: '<svg viewBox="0 0 34 34"><rect x="14" y="2" width="6" height="5" fill="#6b4118"/><circle cx="17" cy="19" r="13" fill="#b8793a" stroke="#6b4118" stroke-width="2"/><circle cx="17" cy="19" r="10" fill="#f4e6c4"/><path d="M8 19h2M24 19h2M17 10v2M10.5 12.5l1.4 1.4M23.5 12.5l-1.4 1.4" stroke="#5a3a1a" stroke-width="1.2"/><path class="needle" d="M17 19L17 11" stroke="#b3242b" stroke-width="1.6" stroke-linecap="round"/><circle cx="17" cy="19" r="1.8" fill="#3a2410"/></svg>'
 };
 function applyTheme(id, animate, from) {
-  const t = THEMES[id] || THEMES.grand, f = $('#frame');
+  if (!THEMES[id]) id = 'grand';
+  const t = THEMES[id], f = $('#frame');
   const go = () => {
     Object.entries(t.v).forEach(([k, v]) => f.style.setProperty('--' + k, v));
     f.style.setProperty('--wall-pat', t.wall); f.style.setProperty('--wall-size', t.wallSize);
@@ -147,9 +155,22 @@ function applyTheme(id, animate, from) {
 }
 
 /* ============================================================
-   LIBRARY
+   LIBRARY — props, sorting, search and the shelf layout engine
    ============================================================ */
-const PROP_SETS = { grand: ['candle', 'plant', 'crystal', 'potion', 'trophy'], arcade: ['console', 'trophy', 'crystal', 'potion', 'plant'], haunted: ['skull', 'candle', 'crystal', 'potion', 'plant'], starship: ['console', 'crystal', 'potion', 'trophy', 'plant'], treehouse: ['plant', 'candle', 'potion', 'crystal', 'trophy'], dungeon: ['candle', 'skull', 'trophy', 'potion', 'crystal'] };
+function cogPath(cx, cy, ro, ri, n) {
+  let d = '';
+  for (let i = 0; i < n; i++) {
+    const a = i * 2 * Math.PI / n, s = 2 * Math.PI / n;
+    [[0, ri], [.14, ro], [.4, ro], [.54, ri]].forEach(([o, r], j) => { d += (i || j ? 'L' : 'M') + (cx + Math.cos(a + o * s) * r).toFixed(1) + ' ' + (cy + Math.sin(a + o * s) * r).toFixed(1); });
+  }
+  return d + 'Z';
+}
+const PROP_SETS = {
+  grand: ['candle', 'plant', 'crystal', 'potion', 'trophy'], arcade: ['console', 'trophy', 'crystal', 'potion', 'plant'], haunted: ['skull', 'candle', 'crystal', 'potion', 'plant'],
+  starship: ['console', 'crystal', 'potion', 'trophy', 'plant'], treehouse: ['plant', 'candle', 'potion', 'crystal', 'trophy'], dungeon: ['candle', 'skull', 'trophy', 'potion', 'crystal'],
+  cabin: ['lantern', 'mug', 'candle', 'plant', 'trophy'], pirate: ['chest', 'globe', 'lantern', 'skull', 'potion'], sakura: ['bonsai', 'lantern', 'potion', 'crystal', 'trophy'],
+  tomb: ['urn', 'candle', 'skull', 'trophy', 'crystal'], steampunk: ['gear', 'globe', 'lantern', 'potion', 'console']
+};
 const PROPS = {
   candle: () => '<div class="prop candle" data-prop="candle"><i class="c-body"></i><i class="flame"></i><i class="c-dish"></i></div>',
   crystal: () => '<div class="prop crystal" data-prop="crystal"><i class="cb-ball"></i><i class="cb-base"></i></div>',
@@ -157,27 +178,153 @@ const PROPS = {
   potion: () => '<div class="prop" data-prop="potion"><svg viewBox="0 0 44 58"><path d="M17 6h10v3l-1 1v12l9 20c1 4-1 8-6 8H15c-5 0-7-4-6-8l9-20V10l-1-1z" fill="rgba(200,230,255,.22)" stroke="rgba(255,255,255,.7)" stroke-width="1.5"/><path d="M12 38l-3 10c-1 4 1 8 6 8h14c5 0 7-4 6-8l-3-10z" fill="var(--glow)" opacity=".9"/><circle class="bub" cx="18" cy="44" r="2" fill="#fff" opacity=".8"/><circle class="bub" style="animation-delay:.9s" cx="27" cy="46" r="1.5" fill="#fff"/><rect x="16" y="3" width="12" height="5" rx="2" fill="#8a5a2e"/></svg></div>',
   trophy: () => '<div class="prop" data-prop="trophy"><svg viewBox="0 0 44 58"><path d="M12 12h20v10c0 7-5 12-10 12s-10-5-10-12z" fill="#e6b422" stroke="#8a5d00" stroke-width="1.5"/><path d="M12 15H6c0 7 3 10 7 10M32 15h6c0 7-3 10-7 10" fill="none" stroke="#e6b422" stroke-width="2.5"/><rect x="19" y="34" width="6" height="9" fill="#c99700"/><rect x="12" y="43" width="20" height="9" rx="2" fill="#6b4a1a"/><path d="M17 17v8" stroke="#fff6c0" stroke-width="2" opacity=".7"/></svg></div>',
   console: () => '<div class="prop" data-prop="console"><svg viewBox="0 0 44 58"><rect x="4" y="30" width="36" height="24" rx="4" fill="#cfd3dc"/><rect x="8" y="36" width="20" height="4" rx="1" fill="#555c6b"/><rect x="8" y="44" width="10" height="5" rx="1" fill="#555c6b"/><circle cx="32" cy="44" r="4" fill="#d33"/><circle class="led" cx="33" cy="35" r="1.8" fill="#7dff9b"/><rect x="10" y="25" width="24" height="6" rx="1" fill="#2a2f3c"/></svg></div>',
-  skull: () => '<div class="prop" data-prop="skull"><svg viewBox="0 0 44 58"><path d="M22 20c-9 0-14 6-14 14 0 5 2 8 6 10v6h16v-6c4-2 6-5 6-10 0-8-5-14-14-14z" fill="#ece6d6" stroke="#9a9080" stroke-width="1.5"/><circle cx="16" cy="34" r="4" fill="#1b1612"/><circle cx="28" cy="34" r="4" fill="#1b1612"/><path d="M22 38l-2 4h4z" fill="#1b1612"/><path d="M17 50v4M22 50v4M27 50v4" stroke="#9a9080" stroke-width="1.5"/></svg></div>'
+  skull: () => '<div class="prop" data-prop="skull"><svg viewBox="0 0 44 58"><path d="M22 20c-9 0-14 6-14 14 0 5 2 8 6 10v6h16v-6c4-2 6-5 6-10 0-8-5-14-14-14z" fill="#ece6d6" stroke="#9a9080" stroke-width="1.5"/><circle cx="16" cy="34" r="4" fill="#1b1612"/><circle cx="28" cy="34" r="4" fill="#1b1612"/><path d="M22 38l-2 4h4z" fill="#1b1612"/><path d="M17 50v4M22 50v4M27 50v4" stroke="#9a9080" stroke-width="1.5"/></svg></div>',
+  lantern: () => '<div class="prop" data-prop="lantern"><svg viewBox="0 0 44 58"><path d="M15 9c0-7 14-7 14 0" stroke="#7a5a2a" fill="none" stroke-width="2.5"/><rect x="12" y="9" width="20" height="4" rx="1" fill="#3a2a14"/><path d="M13 13h18l-2 30H15z" fill="rgba(255,200,100,.25)" stroke="#3a2a14" stroke-width="2"/><ellipse class="lf" cx="22" cy="33" rx="4.5" ry="7" fill="#ffd25a"/><ellipse cx="22" cy="35" rx="2" ry="3.5" fill="#fff6c8"/><rect x="11" y="43" width="22" height="6" rx="1" fill="#3a2a14"/></svg></div>',
+  mug: () => '<div class="prop" data-prop="mug"><svg viewBox="0 0 44 58"><path class="steam" d="M16 24c-3-3 3-6 0-10M24 24c-3-3 3-6 0-10" stroke="#fff" stroke-opacity=".7" fill="none" stroke-width="2" stroke-linecap="round"/><path d="M9 28h24v16a7 7 0 01-7 7h-10a7 7 0 01-7-7z" fill="#c0392b"/><path d="M33 32h3a4 4 0 010 10h-3" stroke="#c0392b" stroke-width="3" fill="none"/><rect x="9" y="28" width="24" height="4" fill="#6b3a1e"/><circle cx="16" cy="40" r="2" fill="#fff" opacity=".7"/><circle cx="22" cy="43" r="1.6" fill="#fff" opacity=".7"/></svg></div>',
+  chest: () => '<div class="prop" data-prop="chest"><svg viewBox="0 0 44 58"><path d="M5 34c0-9 7-15 17-15s17 6 17 15z" fill="#8a5a2e" stroke="#3a2410" stroke-width="1.5"/><rect x="5" y="34" width="34" height="17" rx="2" fill="#6b4220" stroke="#3a2410" stroke-width="1.5"/><path d="M13 21v30M31 21v30" stroke="#c9a24a" stroke-width="3"/><rect x="18" y="31" width="8" height="8" rx="1.5" fill="#e6b422" stroke="#8a5d00"/><circle cx="22" cy="35" r="1.4" fill="#3a2410"/><circle class="glint" cx="9" cy="27" r="1.6" fill="#fff6c0"/><circle class="glint" style="animation-delay:.8s" cx="34" cy="25" r="1.4" fill="#fff6c0"/></svg></div>',
+  globe: () => '<div class="prop" data-prop="globe"><svg viewBox="0 0 44 58"><circle cx="22" cy="26" r="16" fill="#2f7a9a"/><path d="M12 20c4-4 8-3 9 1s-2 6-5 6-5 4-4 7M26 16c4-2 8 0 8 4s-4 4-6 6-1 5-4 5" fill="#6fa85a"/><ellipse cx="22" cy="26" rx="16" ry="5" fill="none" stroke="#fff" stroke-opacity=".25"/><ellipse cx="22" cy="26" rx="6" ry="16" fill="none" stroke="#fff" stroke-opacity=".25"/><path d="M8 12c-3 8-1 18 6 26" fill="none" stroke="#c9a24a" stroke-width="2.5"/><path d="M18 46h8l2 8H16z" fill="#6b4220"/><rect x="13" y="53" width="18" height="3.5" rx="1.5" fill="#4a2e14"/></svg></div>',
+  bonsai: () => '<div class="prop" data-prop="bonsai"><svg viewBox="0 0 44 58"><path d="M22 46c0-9 6-11 3-18-1-3-4-5-2-9" stroke="#5a3a28" stroke-width="3.2" fill="none" stroke-linecap="round"/><g class="leaf"><circle cx="22" cy="14" r="9" fill="#f9b8d0"/><circle cx="12" cy="22" r="7" fill="#ffd9e8"/><circle cx="33" cy="22" r="7.5" fill="#f9b8d0"/><circle cx="26" cy="9" r="4" fill="#ffe8f0"/></g><path d="M11 46h22l-3 10H14z" fill="#7a3a2a"/><rect x="9" y="43" width="26" height="5" rx="2" fill="#9a4a36"/></svg></div>',
+  urn: () => '<div class="prop" data-prop="urn"><svg viewBox="0 0 44 58"><path d="M17 8h10l-1 5c8 3 11 11 9 21-1 8-6 14-13 14s-12-6-13-14c-2-10 1-18 9-21z" fill="#c9a064" stroke="#5a4018" stroke-width="1.5"/><path d="M13 22h18M11 32h22" stroke="#1a6b6b" stroke-width="3"/><path d="M19 38l3-4 3 4zM20 44h4" stroke="#f0c050" stroke-width="1.6" fill="none"/><rect x="15" y="6" width="14" height="4" rx="1.5" fill="#f0c050" stroke="#5a4018"/><rect x="14" y="48" width="16" height="6" rx="1.5" fill="#8a6a38"/></svg></div>',
+  gear: () => '<div class="prop" data-prop="gear"><svg viewBox="0 0 44 58"><g class="cogA"><path d="' + cogPath(17, 40, 15, 12, 10) + '" fill="#c07a3e" stroke="#4a2a12" stroke-width="1.5"/><circle cx="17" cy="40" r="4" fill="#2a1a0c"/></g><g class="cogB"><path d="' + cogPath(33, 22, 10, 7.5, 8) + '" fill="#e8a35e" stroke="#4a2a12" stroke-width="1.5"/><circle cx="33" cy="22" r="3" fill="#2a1a0c"/></g></svg></div>'
 };
-const PROP_QUIPS = { skull: ['Alas, poor save file…', 'I knew him, Horatio. He never backed up.'], console: ['Blow on the cartridge. Trust me.', 'Insert coin. Or don’t. Free spirit.'], trophy: ['Participation trophy: unlocked.', 'Shiny. Do not lick.'], plant: ['It’s a very real plant. Probably.'], potion: ['Tastes like blue. Do not drink.'], crystal: ['The crystal ball says: “Save more often.”', 'I see… a boss fight in your future.'], candle: ['Poof! …and it’s back.'] };
+const PROP_QUIPS = {
+  skull: ['Alas, poor save file…', 'I knew him, Horatio. He never backed up.'], console: ['Blow on the cartridge. Trust me.', 'Insert coin. Or don’t. Free spirit.'], trophy: ['Participation trophy: unlocked.', 'Shiny. Do not lick.'],
+  plant: ['It’s a very real plant. Probably.'], potion: ['Tastes like blue. Do not drink.'], crystal: ['The crystal ball says: “Save more often.”', 'I see… a boss fight in your future.'], candle: ['Poof! …and it’s back.'],
+  lantern: ['Still burning. Unlike your backlog.'], mug: ['Cocoa: +10 HP, +5 cozy.'], chest: ['It’s not a Mimic. …Probably.', 'Yarr! Your loot be safe.'], globe: ['Hidden zone discovered! (It’s Australia.)'],
+  bonsai: ['Patience +1.'], urn: ['Do not open. The curse is mostly cosmetic.'], gear: ['Whirrr. Clank. Efficient.']
+};
 
+function pokeProp(p) {
+  const kind = p.dataset.prop, [x, y] = centerOf(p);
+  p.classList.remove('poke'); void p.offsetWidth; p.classList.add('poke');
+  const q = pick(PROP_QUIPS[kind] || ['…']);
+  if (kind === 'candle') { p.classList.toggle('out'); Snd.play('poof'); burst(x, y - 20, { n: 8, spread: 30, colors: ['#888', '#ccc'], size: 5 }); if (p.classList.contains('out')) setTimeout(() => p.classList.remove('out'), 2200); }
+  else if (kind === 'crystal') { Snd.play('crystal'); burst(x, y - 8, { n: 16, spread: 60, colors: ['#fff', '#b8a0ff', '#7ad8ff'] }); }
+  else if (kind === 'potion' || kind === 'mug') { Snd.play('bloop'); burst(x, y - 10, { n: 10, spread: 40, colors: ['#fff', '#aef'], size: 5 }); }
+  else if (kind === 'trophy') { Snd.play('ding'); burst(x, y - 12, { n: 16, spread: 60, colors: ['#ffd35a', '#fff6c0'] }); }
+  else if (kind === 'chest') { Snd.play('coin'); burst(x, y - 10, { n: 22, spread: 70, colors: ['#ffd35a', '#fff6c0', '#e6b422'] }); }
+  else if (kind === 'plant' || kind === 'bonsai') { Snd.play('rustle'); burst(x, y - 20, { n: 7, spread: 50, colors: kind === 'bonsai' ? ['#f9b8d0', '#ffd9e8'] : ['#6bbf4c', '#4f9a3a'], size: 6 }); }
+  else if (kind === 'gear' || kind === 'console') { Snd.play('clank'); }
+  else if (kind === 'lantern') { Snd.play('poof'); burst(x, y - 10, { n: 8, spread: 36, colors: ['#ffd25a', '#fff'], size: 5 }); }
+  else if (kind === 'globe') { Snd.play('whoosh'); }
+  else if (kind === 'urn') { Snd.play('crystal'); burst(x, y - 14, { n: 12, spread: 50, colors: ['#f0c050', '#fff6c0'] }); }
+  else { Snd.play('err'); }
+  if (Math.random() < .6) toast(esc(q), { ms: 1900 });
+}
+
+/* ----- sorting ----- */
+const SORTS = [
+  ['custom', 'My order', 'The order you set by hand', 'edit'], ['recent', 'Recently written', 'Last entry first', 'clock'], ['az', 'Title A → Z', 'Alphabetical', 'type'],
+  ['za', 'Title Z → A', 'Reverse alphabetical', 'type'], ['newest', 'Newest book first', 'By the day it was started', 'calendar'], ['oldest', 'Oldest book first', 'Your first journals on the left', 'calendar'],
+  ['most', 'Most entries', 'Your longest chronicles first', 'hash'], ['platform', 'Platform', 'PC, Switch, PlayStation…', 'controller'], ['color', 'Rainbow', 'Sorted by cover colour', 'palette'], ['tall', 'Tallest first', 'Big books to little books', 'ruler']
+];
+const sortLabel = id => (SORTS.find(s => s[0] === id) || SORTS[0])[1];
+function colorKey(hex) {
+  const [r, g, b] = hex2rgb(hex).map(v => v / 255), mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, sv = mx ? d / mx : 0;
+  if (sv < .22 || mx < .18) return 1000 + mx * 100;                 // blacks, greys & creams go at the end, dark → light
+  let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; if (h < 0) h += 360;
+  return h + (1 - mx) * 2;
+}
+function shelfBooks() {
+  const q = (S.shelfQ || '').trim().toLowerCase(), counts = countMap(), last = {}, noteOnly = new Set(), hits = new Set();
+  S.entries.forEach(e => { if (!last[e.bookId] || e.createdAt > last[e.bookId]) last[e.bookId] = e.createdAt; });
+  let list = [...S.books];
+  if (q) {
+    const inNotes = new Set(); S.entries.forEach(e => { if ((e.text || '').toLowerCase().includes(q)) inNotes.add(e.bookId); });
+    list = list.filter(b => {
+      if ((b.title || '').toLowerCase().includes(q) || (b.platform || '').toLowerCase().includes(q)) { hits.add(b.id); return true; }
+      if (inNotes.has(b.id)) { noteOnly.add(b.id); return true; } return false;
+    });
+  }
+  const act = b => Math.max(last[b.id] || 0, b.updatedAt || 0, b.createdAt || 0), t = b => (b.title || '').toLowerCase(), hgt = b => bookDims(b, counts[b.id] || 0).h;
+  const by = {
+    custom: (a, b) => a.order - b.order, recent: (a, b) => act(b) - act(a), az: (a, b) => t(a).localeCompare(t(b)), za: (a, b) => t(b).localeCompare(t(a)),
+    newest: (a, b) => b.createdAt - a.createdAt, oldest: (a, b) => a.createdAt - b.createdAt, most: (a, b) => (counts[b.id] || 0) - (counts[a.id] || 0) || t(a).localeCompare(t(b)),
+    platform: (a, b) => (a.platform || '').localeCompare(b.platform || '') || t(a).localeCompare(t(b)), color: (a, b) => colorKey(a.color) - colorKey(b.color), tall: (a, b) => hgt(b) - hgt(a) || t(a).localeCompare(t(b))
+  };
+  list.sort(by[CFG.shelfSort] || by.custom);
+  return { list, counts, noteOnly, hits, q };
+}
+
+/* ----- arrangement: standing, leaning and lying flat ----- */
+function bookMode(b) {
+  const m = CFG.shelfMode || 'casual'; if (m === 'tidy') return 'S';
+  const r = hash(b.id + ':' + (CFG.shelfSeed || 1)) % 100, cut = m === 'messy' ? [40, 72] : [62, 82];
+  return r < cut[0] ? 'S' : r < cut[1] ? 'L' : 'F';
+}
+function buildUnits(list, counts) {
+  const items = list.map(b => { const n = counts[b.id] || 0; return { b, n, d: bookDims(b, n) }; }), U = []; let i = 0;
+  const leanOf = it => { const ang = 8 + (hash(it.b.id + 'a') % 7); return { ang, gap: Math.round(it.d.h * Math.sin(ang * Math.PI / 180)) }; };
+  while (i < items.length) {
+    const it = items[i], mode = bookMode(it.b);
+    if (mode === 'F') {
+      const grp = [it]; let tall = it.d.w + 2; i++;
+      while (i < items.length && bookMode(items[i].b) === 'F' && grp.length < 3 && tall + items[i].d.w + 4 <= 168) { grp.push(items[i]); tall += items[i].d.w + 4; i++; }
+      U.push({ k: 'stack', items: grp, w: Math.max(...grp.map(g => g.d.h)) + 12 }); continue;
+    }
+    if (mode === 'L') {
+      const prev = U[U.length - 1], nx = items[i + 1], { ang, gap } = leanOf(it);
+      if (prev && prev.k === 'stand' && prev.item.d.h >= it.d.h * .92) {          // lean back against the book on the left
+        U.pop(); U.push({ k: 'lean', dir: 'L', sup: prev.item, lean: it, ang, gap, w: prev.item.d.w + 4 + gap + it.d.w + 4 }); i++; continue;
+      }
+      if (nx && bookMode(nx.b) === 'S' && nx.d.h >= it.d.h * .92) {                // lean forward against the book on the right
+        U.push({ k: 'lean', dir: 'R', sup: nx, lean: it, ang, gap, w: it.d.w + 4 + gap + nx.d.w + 4 }); i += 2; continue;
+      }
+    }
+    U.push({ k: 'stand', item: it, w: it.d.w + 4 }); i++;
+  }
+  return U;
+}
 function libAvail() { return Math.max(200, $('#rows').clientWidth - 8); }
 function renderLibrary(o = {}) {
   const rows = $('#rows'); if (!rows.clientWidth) { S.libDirty = true; return; }
   S.libDirty = false;
-  const counts = countMap(), books = [...S.books].sort((a, b) => a.order - b.order), avail = libAvail();
+  const { list, counts, noteOnly, hits, q } = shelfBooks(), avail = libAvail();
   rows.classList.toggle('quiet', !!o.quiet);
-  const items = books.map((b, i) => ({ html: spineHTML(b, counts[b.id] || 0).replace('style="', `style="--i:${i};`), w: bookDims(b, counts[b.id] || 0).w + 4 }));
-  items.push({ html: `<div class="sp sp-new" data-new="1" style="--i:${items.length}">${ic('plus')}<span>NEW QUEST</span></div>`, w: 64, isNew: true });
+  const U = buildUnits(list, counts); let idx = 0;
+  const sp = it => spineHTML(it.b, it.n).replace('style="', `style="--i:${idx++};`);
+  const items = U.map(u => {
+    if (u.k === 'stand') return { html: sp(u.item), w: u.w };
+    if (u.k === 'lean') {
+      const d = u.lean.d, st = u.dir === 'L' ? `margin-left:${u.gap}px;transform-origin:0 100%;transform:rotate(${-u.ang}deg)` : `margin-right:${u.gap}px;transform-origin:100% 100%;transform:rotate(${u.ang}deg)`;
+      const leaner = `<div class="bk lean" style="width:${d.w + 2}px;height:${d.h}px;${st}">${sp(u.lean)}</div>`;
+      return { html: u.dir === 'L' ? sp(u.sup) + leaner : leaner + sp(u.sup), w: u.w };
+    }
+    const flats = u.items.map(it => {
+      const tk = it.d.w + 2, off = hash(it.b.id + 'o') % 10, rot = ((hash(it.b.id + 'r') % 100) / 100 - .5) * 1.4;
+      return `<div class="bk flat" style="width:${it.d.h}px;height:${tk}px;margin-left:${off}px;transform:rotate(${rot.toFixed(2)}deg)"><div class="rot" style="--tk:${tk}px;width:${tk}px;height:${it.d.h}px">${sp(it)}</div></div>`;
+    }).join('');
+    return { html: `<div class="stack" style="width:${u.w}px">${flats}</div>`, w: u.w };
+  });
+  items.push({ html: `<div class="sp sp-new" data-new="1" style="--i:${idx}">${ic('plus')}<span>NEW QUEST</span></div>`, w: 64 });
   const R = [{ items: [], used: 0 }];
   for (const it of items) { const r = R[R.length - 1]; if (r.used + it.w > avail && r.items.length) R.push({ items: [it], used: it.w }); else { r.items.push(it); r.used += it.w; } }
   while (R.length < 3) R.push({ items: [], used: 0 });
   const set = PROP_SETS[CFG.theme] || PROP_SETS.grand;
   R.forEach((r, i) => { if (avail - r.used >= 52) r.prop = set[(i + (hash(CFG.theme) % 3)) % set.length]; });
   rows.innerHTML = R.map(r => `<div class="row"><div class="sb">${r.items.map(i => i.html).join('')}${r.prop ? PROPS[r.prop]() : ''}</div><div class="plank"></div></div>`).join('');
-  if (!books.length) { const sb = $('.sb', rows); sb.insertAdjacentHTML('beforeend', '<div class="hint">Tap the glowing book to start your first journal!</div>'); }
-  S.rowsKey = avail;
+  const first = $('.sb', rows);
+  if (!S.books.length) first.insertAdjacentHTML('beforeend', '<div class="hint">Tap the glowing book to start your first journal!</div>');
+  else if (q && !list.length) first.insertAdjacentHTML('beforeend', `<div class="empty-msg">No books match “${esc(S.shelfQ.trim())}”.<br>The shelf shrugs.</div>`);
+  if (q) { hits.forEach(id => { const e = $(`.sp[data-id="${id}"]`, rows); if (e) e.classList.add('hit'); }); noteOnly.forEach(id => { const e = $(`.sp[data-id="${id}"]`, rows); if (e) e.classList.add('hit', 'hit-note'); }); }
+  S.rowsKey = avail; updateShelfInfo(list.length, noteOnly.size, q);
 }
+function updateShelfInfo(n, inNotes, q) {
+  const parts = [q ? `${n} of ${S.books.length} book${S.books.length === 1 ? '' : 's'}` : `${n} book${n === 1 ? '' : 's'}`];
+  if (q && inNotes) parts.push(`${inNotes} found in notes`);
+  parts.push(CFG.shelfSort === 'custom' ? 'my order' : sortLabel(CFG.shelfSort).toLowerCase());
+  const m = CFG.shelfMode || 'casual'; if (m !== 'casual') parts.push(m);
+  $('#shelfInfo').textContent = parts.join(' · ');
+}
+function initShelfBar() {
+  $('#sbIc').innerHTML = ic('search'); $('#shelfQx').innerHTML = ic('x'); $('#shelfSort').innerHTML = ic('sort') + '<span>Sort</span>';
+  const q = $('#shelfQ');
+  q.addEventListener('input', () => { S.shelfQ = q.value; $('#shelfQx').classList.toggle('hidden', !q.value); renderLibrary({ quiet: true }); });
+  q.addEventListener('keydown', e => { if (e.key === 'Enter') q.blur(); });
+  $('#shelfQx').onclick = () => { q.value = ''; S.shelfQ = ''; $('#shelfQx').classList.add('hidden'); renderLibrary({ quiet: true }); Snd.play('tap'); };
+  $('#shelfSort').onclick = () => { Snd.play('tap'); openShelfOptions(); };
+}
+function clearShelfSearch() { S.shelfQ = ''; const q = $('#shelfQ'); if (q) q.value = ''; $('#shelfQx').classList.add('hidden'); }
 
 let lp = null;
 function initLibraryEvents() {
@@ -195,26 +342,10 @@ function initLibraryEvents() {
   };
   rows.addEventListener('pointerup', end); rows.addEventListener('pointercancel', end);
   rows.addEventListener('contextmenu', e => e.preventDefault());
-  rows.addEventListener('click', e => {
-    const p = e.target.closest('.prop'); if (!p) return;
-    pokeProp(p);
-  });
-  $('#sillItem').addEventListener('click', e => { const s = $('#sillItem'); s.classList.remove('poke'); void s.offsetWidth; s.classList.add('poke'); Snd.play('rustle'); const [x, y] = centerOf(s); burst(x, y, { n: 8, spread: 40, colors: ['#9dff7a', '#fff'] }); });
+  rows.addEventListener('click', e => { const p = e.target.closest('.prop'); if (p) pokeProp(p); });
+  $('#sillItem').addEventListener('click', () => { const s = $('#sillItem'); s.classList.remove('poke'); void s.offsetWidth; s.classList.add('poke'); Snd.play('rustle'); const [x, y] = centerOf(s); burst(x, y, { n: 8, spread: 40, colors: ['#9dff7a', '#fff'] }); });
   $('#win').addEventListener('click', () => { const w = $('#win'); w.classList.toggle('closed'); Snd.play('whoosh'); });
   $('#libScroll').addEventListener('scroll', () => { S.libScroll = $('#libScroll').scrollTop; }, { passive: true });
-}
-function pokeProp(p) {
-  const kind = p.dataset.prop, [x, y] = centerOf(p);
-  p.classList.remove('poke'); void p.offsetWidth; p.classList.add('poke');
-  const q = pick(PROP_QUIPS[kind] || ['…']);
-  if (kind === 'candle') { p.classList.toggle('out'); Snd.play('poof'); burst(x, y - 20, { n: 8, spread: 30, colors: ['#888', '#ccc'], size: 5 }); if (p.classList.contains('out')) setTimeout(() => p.classList.remove('out'), 2200); }
-  else if (kind === 'crystal') { Snd.play('crystal'); burst(x, y - 8, { n: 16, spread: 60, colors: ['#fff', '#b8a0ff', '#7ad8ff'] }); }
-  else if (kind === 'potion') { Snd.play('bloop'); burst(x, y - 10, { n: 10, spread: 40, colors: ['#fff', '#aef'], size: 5 }); }
-  else if (kind === 'trophy') { Snd.play('ding'); burst(x, y - 12, { n: 16, spread: 60, colors: ['#ffd35a', '#fff6c0'] }); }
-  else if (kind === 'plant') { Snd.play('rustle'); burst(x, y - 20, { n: 7, spread: 50, colors: ['#6bbf4c', '#4f9a3a'], size: 6 }); }
-  else if (kind === 'console') { Snd.play('coin'); }
-  else { Snd.play('err'); }
-  if (Math.random() < .6) toast(esc(q), { ms: 1900 });
 }
 
 function bookMenu(id) {
@@ -224,8 +355,10 @@ function bookMenu(id) {
     { icon: 'book', label: 'Open journal', fn: () => { const sp = $(`.sp[data-id="${id}"]`); if (sp) openBook(id, sp); } },
     { icon: 'palette', label: 'Customize book', fn: () => openCustomize(id) }
   ];
-  if (i > 0) items.push({ icon: 'back', label: 'Move left on shelf', fn: () => moveBook(id, -1) });
-  if (i < sorted.length - 1) items.push({ icon: 'forward', label: 'Move right on shelf', fn: () => moveBook(id, 1) });
+  if (CFG.shelfSort === 'custom') {
+    if (i > 0) items.push({ icon: 'back', label: 'Move left on shelf', fn: () => moveBook(id, -1) });
+    if (i < sorted.length - 1) items.push({ icon: 'forward', label: 'Move right on shelf', fn: () => moveBook(id, 1) });
+  } else items.push({ icon: 'sort', label: 'Arrange by hand…', sub: 'Switch the shelf to “My order” so you can move books', fn: () => { CFG.shelfSort = 'custom'; saveCfg(); renderLibrary(); toast('Shelf is back in your own order.'); } });
   items.push({ icon: 'trash', label: 'Burn this book', sub: 'Deletes the journal and every entry', danger: true, fn: () => deleteBook(id) });
   actionSheet(b.title || 'Book', items, 'book');
 }
@@ -258,7 +391,7 @@ async function openBook(id, spEl) {
   st.innerHTML = `<div class="b3-glow"></div><div class="b3"><div class="b3-page"><span>${esc(b.title)}</span></div><div class="b3-cover"><div class="b3-front">${coverHTML(b, n)}</div><div class="b3-in"></div></div></div>`;
   const b3 = $('.b3', st), cover = $('.b3-cover', st), glow = $('.b3-glow', st);
   let dx = 0, dy = 0, sx = .18, sy = .4;
-  if (spEl) { const [cx, cy] = centerOf(spEl), r = spEl.getBoundingClientRect(); dx = cx - FW() / 2; dy = cy - FH() / 2; sx = Math.max(.12, spEl.offsetWidth / 264); sy = Math.max(.2, spEl.offsetHeight / 360); }
+  if (spEl) { const [cx, cy] = centerOf(spEl); dx = cx - FW() / 2; dy = cy - FH() / 2; sx = Math.max(.12, spEl.offsetWidth / 264); sy = Math.max(.2, spEl.offsetHeight / 360); }
   requestAnimationFrame(() => st.classList.add('show'));
   await sleep(120);
   b3.animate([{ transform: `translate(${dx}px,${dy}px) scale(${sx},${sy}) rotateY(78deg)` }, { transform: 'translate(0,0) scale(1.04) rotateY(-8deg)', offset: .75 }, { transform: 'translate(0,0) scale(1) rotateY(0)' }], { duration: 760, easing: 'cubic-bezier(.3,.9,.3,1)', fill: 'forwards' });
@@ -308,7 +441,7 @@ function closeJournal(skipAnim) {
   if (S.view !== 'journal') return; const id = S.cur;
   S.view = 'library'; S.cur = null;
   $('#library').classList.remove('hidden'); $('#libScroll').scrollTop = S.libScroll;
-  if (S.libDirty || S.rowsKey !== libAvail()) renderLibrary({ quiet: true }); else renderLibrary({ quiet: true });
+  renderLibrary({ quiet: true });
   $('#libScroll').scrollTop = S.libScroll;
   const j = $('#journal');
   if (!skipAnim) { Snd.play('close'); j.classList.add('leave'); setTimeout(() => j.classList.add('hidden'), 320); } else j.classList.add('hidden');
